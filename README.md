@@ -1,5 +1,5 @@
 # CCB
-CCB 是一个根据主题生成 CCB 句子的 Python 工具
+我将带领人类开发CCB直到100%
 
 本项目与 Bilibili UP 主 **害怕的狗XGGGGGGGGGGG** 的视频一同发布，欢迎关注！
 
