@@ -3,14 +3,16 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
 from pypinyin import pinyin, Style
 
-SYS_PROMPT = '''请根据用户提供的主题，按以下优先级生成中文短句（无需标点）：
+MIN_LENGTH = 10
+MAX_LENGTH = 30
+SYS_PROMPT = f'''请根据用户提供的主题，按以下优先级生成至少{MIN_LENGTH}个字的中文短句（无需标点）：
 
 第一优先级：主题相关性
 
-句子必须围绕用户给定的主题（如“春天”“学校”等），优先使用与主题直接相关的词汇。
+句子必须围绕用户给定的主题（如“春天”“学校”等），优先使用与主题直接相关的词汇，句子至少有{MIN_LENGTH}个字。
 
 示例：
-✅ 主题“春天” → 花开风吹（优先主题）
+✅ 主题“春天” → 花开风吹过（优先主题）
 ❌ 主题“春天” → 汽车奔跑（偏离主题）
 
 第二优先级：通顺性
@@ -19,7 +21,7 @@ SYS_PROMPT = '''请根据用户提供的主题，按以下优先级生成中文�
 
 示例：
 ✅ 春风拂面（通顺）
-❌ 春菜笔桌（语义断裂）
+❌ 春菜笔（语义断裂）
 
 第三优先级：CCB结构（尽量满足）
 
@@ -28,7 +30,8 @@ SYS_PROMPT = '''请根据用户提供的主题，按以下优先级生成中文�
 结构示例：
 ✅ 春晨碧草翠波（C-C-B-C-C-B，符合）
 ✅ 聪才笔创（C-C-B-C，符合）
-❌ 校园跑步（X-Y-P-B，首字母错误）'''
+❌ 校园跑（X-Y-P，首字母错误）'''
+
 
 
 class CCB_AI(object):
@@ -55,13 +58,14 @@ class CCB_AI(object):
                 self.c_valid_tokens.append(token_id)
             if len(word) == 1 and 'b' in pinyin(word, style=Style.FIRST_LETTER, heteronym=True)[0]:
                 self.b_valid_tokens.append(token_id)
-        self.c_valid_tokens.append(self.tokenizer.eos_token_id)
-        self.b_valid_tokens.append(self.tokenizer.eos_token_id)
 
         self.index = 0
 
     def prefix_allowed_tokens_fn(self, batch_id, input_ids):
         self.index += 1
+        if self.index > MIN_LENGTH:
+            self.c_valid_tokens.append(self.tokenizer.eos_token_id)
+            self.b_valid_tokens.append(self.tokenizer.eos_token_id)
         if self.index % 3:
             return self.c_valid_tokens
         return self.b_valid_tokens
@@ -90,9 +94,9 @@ class CCB_AI(object):
             kwargs={
                 "input_ids": model_inputs["input_ids"],
                 "attention_mask": model_inputs["attention_mask"],
-                "max_length": size + 10,
+                "max_length": size + MAX_LENGTH,
                 "prefix_allowed_tokens_fn": self.prefix_allowed_tokens_fn,
-                "temperature": 0.5,
+                "temperature": 0.7,
                 "use_cache": True,
                 "do_sample": True,
                 "streamer": streamer  # 关键：使用 Streamer
@@ -106,6 +110,8 @@ class CCB_AI(object):
             print(new_text, end="", flush=True)  # 实时打印
 
         print()  # 换行
+        self.c_valid_tokens.pop()
+        self.b_valid_tokens.pop()
 
 
 if __name__ == '__main__':
