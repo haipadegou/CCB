@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>虚拟文件管理系统</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.4.0/axios.min.js"></script>
+    <style>
+        body { padding: 20px; }
+        #file-explorer { display: flex; }
+        #sidebar { width: 250px; border-right: 1px solid #ddd; padding-right: 10px; }
+        #file-content { flex-grow: 1; padding-left: 10px; }
+        .folder, .file { cursor: pointer; padding: 5px; }
+        .folder:hover, .file:hover { background-color: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>虚拟CCB文件浏览器</h2>
+        <div>
+            <label for="language-select">选择语言：</label>
+            <select id="language-select" class="form-select" style="width: 200px;"></select>
+        </div>
+        <p id="total-files">总文件数量: 0</p>
+        <div id="file-explorer">
+            <div id="sidebar"></div>
+            <div id="file-content">
+                <h4 id="file-name">请选择文件</h4>
+                <pre id="file-text"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let fileCount = 0;
+        let maxDepth = 0;
+        let rootNum = 0;
+        let totalFiles = 0;
+
+        document.addEventListener("DOMContentLoaded", function() {
+            loadLanguages();
+        });
+
+        async function loadLanguages() {
+            try {
+                const response = await axios.get("/explorer/index");
+                const select = document.getElementById("language-select");
+                select.innerHTML = Object.keys(response.data).map(lang => `<option value="${lang}">${lang}</option>`).join('');
+                select.addEventListener("change", () => loadFiles(select.value));
+                loadFiles(select.value);
+            } catch (error) {
+                console.error("加载语言失败", error);
+            }
+        }
+
+        async function loadFiles(lang) {
+            try {
+                const response = await axios.get(`/explorer/language?lang=${lang}`);
+                const { c, b } = response.data;
+                totalFiles = c.length ** 2 * b.length;
+                document.getElementById("total-files").textContent = `${lang}的总CCB词数量: ${totalFiles}`;
+                generateFileTree(c, b);
+            } catch (error) {
+                console.error("加载文件失败", error);
+            }
+        }
+
+        function generateFileTree(c, b) {
+            const sidebar = document.getElementById("sidebar");
+            sidebar.innerHTML = "";
+            fileCount = c.length ** 2 * b.length;
+            maxDepth = Math.floor(Math.log10(fileCount));
+            rootNum = Math.ceil(fileCount / 10 ** maxDepth);
+
+            for (let i = 0; i < rootNum; i++) {
+                let folder = createFolderElement(i.toString(), c, b);
+                sidebar.appendChild(folder);
+            }
+        }
+
+        function createFolderElement(name, c, b) {
+            let folder = document.createElement("div");
+            folder.classList.add("folder");
+            folder.textContent = `文件夹 ${name}`;
+            folder.dataset.path = name;
+            folder.dataset.originalText = folder.textContent;
+            folder.addEventListener("click", (event) => {
+                event.stopPropagation();
+                toggleFolder(folder, c, b);
+            });
+            return folder;
+        }
+
+        function toggleFolder(folder, c, b) {
+            let expanded = folder.dataset.expanded === "true";
+            folder.dataset.expanded = expanded ? "false" : "true";
+            if (expanded) {
+                folder.innerHTML = folder.dataset.originalText;
+            } else {
+                expandFolder(folder, c, b);
+            }
+        }
+
+        function expandFolder(folder, c, b) {
+            let path = folder.dataset.path;
+            let depth = path.length;
+            let newFiles = calculateFolderSize(parseInt(path), depth, c.length, b.length);
+
+            if (depth < maxDepth - 1) {
+                for (let i = 0; i < newFiles; i++) {
+                    let subPath = path + i;
+                    let subItem = createFolderElement(subPath, c, b);
+                    folder.appendChild(subItem);
+                }
+            } else {
+                for (let i = 0; i < newFiles; i++) {
+                    let file = document.createElement("div");
+                    file.classList.add("file");
+                    file.textContent = `文件 ${path + i}`;
+                    file.dataset.path = path + i;
+                    file.addEventListener("click", (event) => {
+                        event.stopPropagation();
+                        openFile(file.dataset.path, c, b);
+                    });
+                    folder.appendChild(file);
+                }
+            }
+        }
+
+        function calculateFolderSize(addr, depth, cl, bl) {
+            depth = maxDepth - depth + 1;
+            if ((addr + 1) * (10 ** depth) > fileCount) {
+                return Math.ceil((fileCount - addr * (10 ** depth)) / (10 ** (depth - 1)));
+            }
+            else {
+                return 10;
+            }
+        }
+
+        function openFile(path, c, b) {
+            let fileContent = computeFileContent(parseInt(path, 10), c, b);
+            document.getElementById("file-name").textContent = `文件 ${path}`;
+            document.getElementById("file-text").textContent = fileContent;
+        }
+
+        function computeFileContent(addr, c, b) {
+            let cl = c.length, bl = b.length;
+            let product = cl * bl;
+            let content = '';
+            for (let i = addr * 10; i < addr * 10 + 10; i++) {
+                let x = Math.floor(i / product);
+                if (x >= cl) break;
+                let remaining = i % product;
+                let y = Math.floor(remaining / bl);
+                let z = remaining % bl;
+                content += `${c[x]} ${c[y]} ${b[z]}\n`;
+            }
+            return content;
+        }
+    </script>
+</body>
+</html>
