@@ -1,3 +1,3 @@
 flask>=3.0.3
 openai>=1.0.0
-pypinyin>=1.0.0
+pypinyin>=0.0.1
