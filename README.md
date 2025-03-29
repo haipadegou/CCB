@@ -6,6 +6,9 @@
 我将带领人类开发CCB直到100%
 
 本项目与 Bilibili UP 主 **害怕的狗XGGGGGGGGGGG** 的视频一同发布，欢迎关注！
+# 在线DEMO
+<!--作者需要在合并拉去请求时更换链接内容↓-->
+[CCB生成器](https://ccb.focalors.ltd)
 
 ## 技术栈
 - Python
