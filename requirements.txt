@@ -2,3 +2,4 @@ flask>=3.0.3
 openai>=1.0.0
 pypinyin>=0.0.1
 python-dotenv>=1.0.0
+transformers>=0.0.1
