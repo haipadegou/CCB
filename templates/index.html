@@ -4,193 +4,258 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CCB 句子生成器</title>
-    <link rel="stylesheet" href="https://unpkg.com/naive-ui">
     <style>
         body {
             font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #667eea;
+            color: white;
             margin: 0;
-            padding: 0;
+            flex-direction: column;
         }
         .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 24px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .settings {
+            margin-top: 15px;
+            text-align: center;
+        }
+        .settings label {
+            display: block;
+            margin-top: 10px;
+        }
+        .settings input {
+            width: 80px;
+            padding: 5px;
+            margin-top: 5px;
+            text-align: center;
+            border-radius: 5px;
+            border: none;
+        }
+        .settings .tooltip {
+            font-size: 0.8em;
+            color: #ffcc00;
+            margin-top: 5px;
         }
         .result-container {
-            margin-top: 24px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        .sentence {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #ffeb3b;
+        }
+        .sentence.invalid {
+            color: #b0b0b0;
+        }
+        .explanation {
+            font-size: 0.9em;
+            color: #d1d1d1;
+            margin-top: 5px;
+        }
+        .history {
+            margin-top: 20px;
+            max-width: 400px;
+            text-align: left;
+        }
+        .history-item {
+            padding: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .notice {
+            font-size: 0.9em;
+            color: #ffcc00;
+            margin-top: 15px;
+            text-align: center;
+            max-width: 400px;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            margin-top: 10px;
+        }
+        button {
+            margin-top: 15px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background: #ff9800;
+            color: white;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #e68900;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid white;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .history-link {
+            margin-top: 15px;
+            font-size: 1em;
+            color: #00c3ff;
+            text-decoration: none;
+        }
+        .history-link:hover {
+            text-decoration: underline;
         }
     </style>
+    <script>
+        let history = [];
+
+        async function startTask() {
+            const theme = document.getElementById("theme").value;
+            const lengthMin = document.getElementById("lengthMin").value;
+            const temperature = document.getElementById("temperature").value;
+            const button = document.getElementById("generateButton");
+            button.disabled = true;
+            button.innerHTML = "生成中 <span class='spinner'></span>";
+            const loadingMessage = document.getElementById("loadingMessage");
+
+            history = [];
+            updateHistory();
+            const explanationDiv = document.getElementById("explanation");
+            explanationDiv.innerHTML = ""
+            loadingMessage.style.display = "block";
+
+            const response = await fetch('/submit', {
+                method: 'POST',
+                body: JSON.stringify({ theme: theme, length_min: lengthMin, temperature: temperature }),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await response.json();
+            if (data.task_id) {
+                localStorage.setItem('task_id', data.task_id);
+                checkTaskStatus(data.task_id);
+            } else {
+                explanationDiv.innerHTML = `<p style='color: red;'>⚠️ ${data.error}</p>`;
+                button.disabled = false;
+                button.innerHTML = "生成 ✨";
+                loadingMessage.style.display = "none";
+            }
+        }
+        async function checkTaskStatus(task_id) {
+            const interval = setInterval(async () => {
+                const historyDiv = document.getElementById("history");
+                const explanationDiv = document.getElementById("explanation");
+                const statusRes = await fetch(`/status/${task_id}`);
+                const data = await statusRes.json();
+                const button = document.getElementById("generateButton");
+
+                console.log('任务状态:', data);
+
+                if (data.sentences) {
+                    history = []
+                    data.sentences.forEach(sentence => {
+                        if (sentence.valid) {
+                            history.unshift({ theme, sentence: "✅" + sentence.sentence, valid: sentence.valid });
+                        }
+                        else {
+                            history.unshift({ theme, sentence: "❌" + sentence.sentence, valid: sentence.valid });
+                        }
+                    });
+                    updateHistory();
+                }
+                if (data.explanation) {
+                    explanationDiv.innerHTML = `💡 ${data.explanation}`;
+                    button.disabled = false;
+                    button.innerHTML = "生成 ✨";
+                    loadingMessage.style.display = "none";
+                }
+                if (data.error) {
+                    explanationDiv.innerHTML = `<p style='color: red;'>⚠️ ${data.error}</p>`;
+                    button.disabled = false;
+                    button.innerHTML = "生成 ✨";
+                    loadingMessage.style.display = "none";
+                }
+
+                if (data.status === 'completed' || data.status === 'failed') {
+                    clearInterval(interval);
+                    localStorage.removeItem('task_id');
+                }
+
+
+            }, 3000); // 每3秒查询一次
+        }
+        function updateHistory() {
+            const historyDiv = document.getElementById("history");
+            historyDiv.innerHTML = history.map(item => `
+                <div class="history-item">
+                    <p class="${item.valid ? 'sentence' : 'sentence invalid'}">${item.sentence}</p>
+                </div>
+            `).join("");
+        }
+        window.onload = function() {
+            console.log("start")
+            const task_id = localStorage.getItem('task_id');
+            if (task_id) {
+                document.getElementById("loadingMessage").style.display = "block";
+                const button = document.getElementById("generateButton");
+                button.disabled = true;
+                button.innerHTML = "生成中 <span class='spinner'></span>";
+                checkTaskStatus(task_id);
+            }
+        };
+    </script>
 </head>
 <body>
-    <div id="app">
-        <n-config-provider>
-            <n-space vertical class="container">
-                <n-h1>CCB 句子生成器</n-h1>
-                <n-alert type="warning" title="注意">
-                    您输入的数据可能会用于训练，请勿输入隐私信息。<br>本系统的句子由 DeepSeek 生成。
-                </n-alert>
-                
-                <n-input 
-                    v-model:value="theme" 
-                    placeholder="请输入主题" 
-                    clearable
-                />
-                
-                <n-space>
-                    <n-input-number 
-                        v-model:value="lengthMin" 
-                        :min="1" 
-                        :max="15" 
-                        :step="1"
-                        placeholder="句子长度下限"
-                    />
-                    <n-input-number 
-                        v-model:value="temperature" 
-                        :min="0" 
-                        :max="2" 
-                        :step="0.1"
-                        placeholder="温度"
-                    />
-                </n-space>
-                
-                <n-button 
-                    type="primary" 
-                    @click="startTask" 
-                    :disabled="loading"
-                    :loading="loading"
-                    size="large"
-                    round
-                    style="margin-top: 16px"
-                >
-                    <template #icon>
-                        <n-icon>
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20">
-                                <path fill="currentColor" d="M12 2a10 10 0 0 1 10 10a10 10 0 0 1-10 10A10 10 0 0 1 2 12A10 10 0 0 1 12 2m0 2a8 8 0 0 0-8 8a8 8 0 0 0 8 8a8 8 0 0 0 8-8a8 8 0 0 0-8-8m-1 3h2v6h-2V7m0 8h2v2h-2v-2z"/>
-                            </svg>
-                        </n-icon>
-                    </template>
-                    生成句子
-                </n-button>
-                
-                <n-alert v-if="loading" type="info">
-                    生成需要几分钟，可以暂时退出页面...
-                </n-alert>
-                
-                <div class="result-container">
-                    <n-card v-for="(item, index) in history" :key="index" :bordered="false" hoverable>
-                        <n-space vertical>
-                            <n-text :type="item.valid ? 'success' : 'error'" strong>
-                                {{ item.sentence }}
-                            </n-text>
-                            <n-text depth="3" style="font-size: 12px">
-                                {{ new Date().toLocaleString() }}
-                            </n-text>
-                        </n-space>
-                    </n-card>
-                    
-                    <n-text v-if="explanation" type="info">
-                        💡 {{ explanation }}
-                    </n-text>
-                </div>
-                
-                <n-space>
-                    <n-button text type="primary" tag="a" href="/history">
-                        查看网友生成的句子
-                    </n-button>
-                    <n-button text type="primary" tag="a" href="/explorer">
-                        浏览 CCB 词
-                    </n-button>
-                </n-space>
-            </n-space>
-        </n-config-provider>
+    <div class="container">
+        <h1>CCB 句子生成器</h1>
+        <p class="notice">⚠️ 您输入的数据可能会用于训练，请勿输入隐私信息。<br>本系统的句子由 DeepSeek 生成。</p>
+        <label for="theme">输入主题:</label>
+        <input type="text" id="theme" placeholder="请输入主题">
+        <button id="generateButton" onclick="startTask()">生成 ✨</button>
+        <p id="loadingMessage" class="loading-message" style="display: none;">⏳ 生成需要几分钟，可以暂时退出页面...</p>
+
+        <div class="result-container">
+            <div class="history" id="history"></div>
+            <p id="explanation" class="explanation"></p>
+        </div>
+
+
+        <div class="settings">
+            <label for="lengthMin">句子长度下限 (1-15):</label>
+            <input type="number" id="lengthMin" min="1" max="15" value="3">
+            <label for="temperature">温度 (0.0-2.0):</label>
+            <input type="number" id="temperature" step="0.1" min="0" max="2" value="1.5">
+            <p class="tooltip">温度决定生成结果的随机性。较低的值 (如 0.5) 使输出更确定，较高的值 (如 2.0) 使输出更加多样化。</p>
+        </div>
+
+        <a href="/history" class="history-link">查看网友生成的句子</a>
+        <a href="/explorer" class="history-link">浏览 CCB 词</a>
+
     </div>
-
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://unpkg.com/naive-ui"></script>
-    <script>
-        const { createApp, ref } = Vue;
-        const { 
-            NConfigProvider, 
-            NSpace, 
-            NH1, 
-            NAlert, 
-            NInput, 
-            NInputNumber, 
-            NButton, 
-            NText, 
-            NCard 
-        } = naive;
-
-        createApp({
-            components: {
-                NConfigProvider,
-                NSpace,
-                NH1,
-                NAlert,
-                NInput,
-                NInputNumber,
-                NButton,
-                NText,
-                NCard
-            },
-            setup() {
-                const theme = ref('');
-                const lengthMin = ref(3);
-                const temperature = ref(1.5);
-                const loading = ref(false);
-                const history = ref([]);
-                const explanation = ref('');
-                
-                async function startTask() {
-                    loading.value = true;
-                    history.value = [];
-                    explanation.value = '';
-                    
-                    try {
-                        const response = await fetch('/submit', {
-                            method: 'POST',
-                            body: JSON.stringify({ 
-                                theme: theme.value, 
-                                length_min: lengthMin.value, 
-                                temperature: temperature.value 
-                            }),
-                            headers: { 'Content-Type': 'application/json' }
-                        });
-                        
-                        const data = await response.json();
-                        if (data.task_id) {
-                            localStorage.setItem('task_id', data.task_id);
-                            checkTaskStatus(data.task_id);
-                        } else {
-                            explanation.value = data.error;
-                            loading.value = false;
-                        }
-                    } catch (error) {
-                        explanation.value = error.message;
-                        loading.value = false;
-                    }
-                }
-                
-                async function checkTaskStatus(task_id) {
-                    const interval = setInterval(async () => {
-                        const statusRes = await fetch(`/status/${task_id}`);
-                        const data = await statusRes.json();
-                        
-                        if (data.sentences) {
-                            history.value = data.sentences.map(sentence => ({
-                                sentence: (sentence.valid ? '✅' : '❌') + sentence.sentence,
-                                valid: sentence.valid
-                            }));
-                        }
-                        
-                        if (data.explanation) {
-                            explanation.value = data.explanation;
-                            loading.value = false;
-                        }
-                        
-                        if (data.error) {
-                            explanation.value = data.error;
-                            loading.value = false;
-                        }
-                        
-                        if (
+</body>
+</html>
