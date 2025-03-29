@@ -11,8 +11,8 @@ load_dotenv()  # 新增环境变量加载
 
 app = Flask(__name__)
 client = OpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY"),  # 修改为环境变量读取方式
-    base_url="https://api.chatanywhere.tech"
+    api_key=os.environ.get("OPENAI_API_KEY"),
+    base_url=os.environ.get("OPENAI_API_URL"),
 )
 
 # 限制最大并发任务数
