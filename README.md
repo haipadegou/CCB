@@ -34,12 +34,15 @@ OPENAI_API_URL = "https://api.deepseek.com"
 6. 等待部署完成
 7. 进入项目设置，可添加自己的域名
 # 本地部署教程
+## 克隆项目
+```bash
+git clone https://github.com/haipadegou/CCB.git
+```
+
 ## 安装
 ### 1. 安装依赖
 ```bash
-pip install flask
-pip install openai
-pip install pypinyin
+
 ```
 
 ### 2. 填写API url 和 key
@@ -57,8 +60,7 @@ python app.py
 因为transformers可以修改模型输出的概率分布，所以可以程序化的控制输出，不需要通过深度思考来检查句子。这可以减少句子生成的时间。
 ### 1. 安装依赖
 ```bash
-pip install transformers
-pip install pypinyin
+pip install -r -requirements.txt
 ```
 PyTorch安装方法：[https://pytorch.org/get-started/locally/](https://pytorch.org/get-started/locally/)
 
