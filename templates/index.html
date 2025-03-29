@@ -4,10 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CCB 句子生成器</title>
-    <!-- 引入Naive UI样式 -->
-    <script src="https://cdn.jsdelivr.net/npm/vue@3.2.47/dist/vue.global.prod.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/naive-ui@2.34.3/dist/index.prod.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/naive-ui@2.34.3/dist/style.css" rel="stylesheet">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -137,36 +133,21 @@
         }
     </style>
     <script>
-        const app = Vue.createApp({
-            data() {
-                return {
-                    loading: false,
-                    theme: '',
-                    history: [],
-                    explanation: '',
-                    lengthMin: 3,  // 新增默认值
-                    temperature: 1,  // 新增默认值
-                    columns: [
-                      { title: '内容', key: 'content', ellipsis: true },
-                      { title: '状态', key: 'status', width: 80 },
-                      { title: '时间', key: 'timestamp', width: 180 }
-                    ],
-                    pagination: { pageSize: 5 }
-                }
-            },
-            methods: {
-                async startTask() {
-            // 修改为使用 Vue 响应式数据
-            const theme = this.theme;
-            const lengthMin = this.lengthMin;
-            const temperature = this.temperature;
-            
-            this.loading = true;  // 使用 Vue 状态控制
+        let history = [];
+
+        async function startTask() {
+            const theme = document.getElementById("theme").value;
+            const lengthMin = document.getElementById("lengthMin").value;
+            const temperature = document.getElementById("temperature").value;
             const button = document.getElementById("generateButton");
-            
-            // 使用 Vue 响应式更新历史记录
-            this.history = [];
-            this.explanation = ''
+            button.disabled = true;
+            button.innerHTML = "生成中 <span class='spinner'></span>";
+            const loadingMessage = document.getElementById("loadingMessage");
+
+            history = [];
+            updateHistory();
+            const explanationDiv = document.getElementById("explanation");
+            explanationDiv.innerHTML = ""
             loadingMessage.style.display = "block";
 
             const response = await fetch('/submit', {
@@ -179,42 +160,55 @@
                 localStorage.setItem('task_id', data.task_id);
                 checkTaskStatus(data.task_id);
             } else {
-                this.explanation = `⚠️ ${data.error}`;
+                explanationDiv.innerHTML = `<p style='color: red;'>⚠️ ${data.error}</p>`;
                 button.disabled = false;
                 button.innerHTML = "生成 ✨";
                 loadingMessage.style.display = "none";
             }
-        },
-        async checkTaskStatus(task_id) {  // 修正方法定义方式
+        }
+        async function checkTaskStatus(task_id) {
             const interval = setInterval(async () => {
+                const historyDiv = document.getElementById("history");
+                const explanationDiv = document.getElementById("explanation");
                 const statusRes = await fetch(`/status/${task_id}`);
                 const data = await statusRes.json();
-                
+                const button = document.getElementById("generateButton");
+
+                console.log('任务状态:', data);
+
                 if (data.sentences) {
+                    history = []
                     data.sentences.forEach(sentence => {
-                        this.history.unshift({  // 使用 Vue 响应式数据
-                            theme: this.theme,
-                            content: sentence.valid ? '✅ ' + sentence.sentence : '❌ ' + sentence.sentence,
-                            status: sentence.valid ? '有效' : '无效',
-                            timestamp: new Date().toLocaleString()
-                        });
+                        if (sentence.valid) {
+                            history.unshift({ theme, sentence: "✅" + sentence.sentence, valid: sentence.valid });
+                        }
+                        else {
+                            history.unshift({ theme, sentence: "❌" + sentence.sentence, valid: sentence.valid });
+                        }
                     });
+                    updateHistory();
                 }
-                
-                // 更新解释和错误状态
-                if (data.explanation || data.error) {
-                    this.explanation = data.explanation || `⚠️ ${data.error}`;
-                    this.loading = false;
+                if (data.explanation) {
+                    explanationDiv.innerHTML = `💡 ${data.explanation}`;
+                    button.disabled = false;
+                    button.innerHTML = "生成 ✨";
+                    loadingMessage.style.display = "none";
+                }
+                if (data.error) {
+                    explanationDiv.innerHTML = `<p style='color: red;'>⚠️ ${data.error}</p>`;
+                    button.disabled = false;
+                    button.innerHTML = "生成 ✨";
+                    loadingMessage.style.display = "none";
                 }
 
                 if (data.status === 'completed' || data.status === 'failed') {
                     clearInterval(interval);
                     localStorage.removeItem('task_id');
                 }
-            }, 3000);
-        },
-        
-        // 删除 updateHistory 方法（已通过响应式数据自动更新）
+
+
+            }, 3000); // 每3秒查询一次
+        }
         function updateHistory() {
             const historyDiv = document.getElementById("history");
             historyDiv.innerHTML = history.map(item => `
@@ -222,7 +216,7 @@
                     <p class="${item.valid ? 'sentence' : 'sentence invalid'}">${item.sentence}</p>
                 </div>
             `).join("");
-        },
+        }
         window.onload = function() {
             console.log("start")
             const task_id = localStorage.getItem('task_id');
@@ -233,64 +227,29 @@
                 button.innerHTML = "生成中 <span class='spinner'></span>";
                 checkTaskStatus(task_id);
             }
-        }
+        };
     </script>
 </head>
 <body>
     <div class="container">
         <h1>CCB 句子生成器</h1>
         <p class="notice">⚠️ 您输入的数据可能会用于训练，请勿输入隐私信息。<br>本系统的句子由 DeepSeek 生成。</p>
-        <n-form-item label="输入主题:" path="theme">
-          <n-input
-            v-model:value="theme"
-            placeholder="请输入主题"
-            round
-            clearable
-            :style="{ width: '300px' }"
-          />
-        </n-form-item>
-        <n-button id="generateButton" @click="startTask" type="primary" size="large" :disabled="loading">
-    {{ loading ? '生成中' : '生成 ✨' }}
-    <template #icon>
-        <n-spin v-if="loading" size="small" />
-    </template>
-</n-button>
+        <label for="theme">输入主题:</label>
+        <input type="text" id="theme" placeholder="请输入主题">
+        <button id="generateButton" onclick="startTask()">生成 ✨</button>
         <p id="loadingMessage" class="loading-message" style="display: none;">⏳ 生成需要几分钟，可以暂时退出页面...</p>
 
         <div class="result-container">
-            <n-card title="生成历史" :bordered="false" style="margin-top: 20px">
-              <n-data-table
-                :bordered="false"
-                :single-line="false"
-                :columns="columns"
-                :data="history"
-                :pagination="pagination"
-                style="margin-top: 15px"
-              />
-            </n-card>
+            <div class="history" id="history"></div>
             <p id="explanation" class="explanation"></p>
         </div>
 
 
         <div class="settings">
             <label for="lengthMin">句子长度下限 (1-15):</label>
-            <n-form-item label="句子长度下限" path="lengthMin">
-              <n-input-number
-                v-model:value="lengthMin"
-                :min="1"
-                :max="15"
-                :style="{ width: '120px' }"
-              />
-            </n-form-item>
-            <n-form-item label="温度参数" path="temperature">
-              <n-input-number
-                v-model:value="temperature"
-                :min="0"
-                :max="2"
-                :step="0.1"
-                :style="{ width: '120px' }"
-              />
-            </n-form-item>
+            <input type="number" id="lengthMin" min="1" max="15" value="3">
+            <label for="temperature">温度 (0.0-2.0):</label>
+            <input type="number" id="temperature" step="0.1" min="0" max="2" value="1.5">
             <p class="tooltip">温度决定生成结果的随机性。较低的值 (如 0.5) 使输出更确定，较高的值 (如 2.0) 使输出更加多样化。</p>
         </div>
 
