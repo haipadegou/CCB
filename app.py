@@ -7,7 +7,7 @@ import os
 import json
 
 app = Flask(__name__)
-client = OpenAI(api_key='deepseek-api-key', base_url="https://api.deepseek.com")
+client = OpenAI(api_key='process.env.OPENAI_API_KEY', base_url="https://api.chatanywhere.tec")
 
 # 限制最大并发任务数
 MAX_CONCURRENT_REQUESTS = 1
