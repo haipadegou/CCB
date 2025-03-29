@@ -113,11 +113,21 @@ def explain(messages):
     return chat("gpt-3.5-turbo", messages, 1)
 
 
+# Add at the top with other imports
+from threading import Lock
+
+# Add after tasks initialization
+task_lock = Lock()
+
+# Modify run_task function
 def run_task(task_id, theme, length_min, temp):
-    """ 任务执行逻辑 """
-    if not semaphore.acquire(blocking=False):
-        tasks[task_id]["error"] = "服务器繁忙，请稍后再试"
-        tasks[task_id]["status"] = "failed"
+    try:
+        with task_lock:
+            if not semaphore.acquire(blocking=False):
+                tasks[task_id]["error"] = "服务器繁忙，请稍后再试"
+                tasks[task_id]["status"] = "failed"
+                return
+    except KeyError:
         return
 
     try:
