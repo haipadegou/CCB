@@ -7,7 +7,7 @@ import os
 import json
 
 app = Flask(__name__)
-client = OpenAI(api_key='process.env.OPENAI_API_KEY', base_url="https://api.chatanywhere.tec")
+client = OpenAI(api_key='process.env.OPENAI_API_KEY', base_url="https://api.chatanywhere.tech/v1")
 
 # 限制最大并发任务数
 MAX_CONCURRENT_REQUESTS = 1
