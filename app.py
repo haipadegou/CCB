@@ -5,9 +5,15 @@ from threading import Semaphore, Thread
 import uuid
 import os
 import json
+from dotenv import load_dotenv  # 新增导入
+
+load_dotenv()  # 新增环境变量加载
 
 app = Flask(__name__)
-client = OpenAI(api_key='process.env.OPENAI_API_KEY', base_url="https://api.chatanywhere.tech/v1")
+client = OpenAI(
+    api_key=os.environ.get("OPENAI_API_KEY"),  # 修改为环境变量读取方式
+    base_url="https://api.chatanywhere.tech/v1"
+)
 
 # 限制最大并发任务数
 MAX_CONCURRENT_REQUESTS = 1
