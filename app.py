@@ -99,7 +99,8 @@ def generate(theme, min_length, temperature, messages=None):
             {"role": "system", "content": "You are a helpful assistant"},
             {"role": "user", "content": prompt},
         ]
-    content = chat("deepseek-reasoner", messages, temperature)
+    # 使用OpenAI的GPT-3.5-turbo模型进行对话，获取生成的内容
+    content = chat("gpt-3.5-turbo", messages, temperature)
     messages.append({"role": "assistant", "content": content})
 
     return messages
@@ -108,7 +109,8 @@ def generate(theme, min_length, temperature, messages=None):
 def explain(messages):
     """ 生成解释 """
     messages.append({"role": "user", "content": "把这些你输出的句子翻译成正常的语言"})
-    return chat("deepseek-chat", messages, 1)
+    # 调用 chat 函数生成解释，使用 gpt-3.5-turbo 模型，temperature 设为 1
+    return chat("gpt-3.5-turbo", messages, 1)
 
 
 def run_task(task_id, theme, length_min, temp):
