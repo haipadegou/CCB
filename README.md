@@ -42,8 +42,8 @@ pip install openai
 pip install pypinyin
 ```
 
-### 2. 填写API key
-在`app.py`的第10行填入DeepSeek API key
+### 2. 填写API url 和 key
+在`.env.example`的第填入DeepSeek API url和key, 同时将文件名更换为`.env`
 
 ## 使用方法
 运行程序，然后进入网站[http://127.0.0.1:5000](http://127.0.0.1:5000/)
