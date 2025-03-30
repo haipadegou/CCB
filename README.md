@@ -43,7 +43,7 @@ git clone https://github.com/haipadegou/CCB.git
 ## 安装
 ### 1. 安装依赖
 ```bash
-
+pip install -r requirements.txt
 ```
 
 ### 2. 填写API url 和 key
