@@ -5,9 +5,15 @@ from threading import Semaphore, Thread
 import uuid
 import os
 import json
+from dotenv import load_dotenv  # 新增导入
+
+load_dotenv()  # 新增环境变量加载
 
 app = Flask(__name__)
-client = OpenAI(api_key='deepseek-api-key', base_url="https://api.deepseek.com")
+client = OpenAI(
+    api_key=os.environ.get("OPENAI_API_KEY"),
+    base_url=os.environ.get("OPENAI_API_URL"),
+)
 
 # 限制最大并发任务数
 MAX_CONCURRENT_REQUESTS = 1
@@ -17,7 +23,7 @@ semaphore = Semaphore(MAX_CONCURRENT_REQUESTS)
 tasks = {}  # 结构: {task_id: {"status": "pending", "sentences": [], "explanation": None, "error": None}}
 
 def read_char(fn):
-    with open(fn, encoding='utf-8') as f:
+    with open(fn, encoding='utf-8') as f:  # 已明确指定UTF-8
         data = f.read().split('\n')
         f.close()
         i = 0
@@ -54,6 +60,9 @@ def chat(model, messages, temperature=1):
 
 def validate(txt, min_length):
     """ 验证生成的句子是否符合规则 """
+    if txt is None:
+        return "输入为空", ""
+
     txt = txt.lower()
     p = pinyin(txt, style=Style.FIRST_LETTER)
     j = 0
@@ -93,8 +102,13 @@ def generate(theme, min_length, temperature, messages=None):
             {"role": "system", "content": "You are a helpful assistant"},
             {"role": "user", "content": prompt},
         ]
-    content = chat("deepseek-reasoner", messages, temperature)
+    # 使用OpenAI的GPT-3.5-turbo模型进行对话，获取生成的内容
+    content = chat("gpt-3.5-turbo", messages, temperature)
     messages.append({"role": "assistant", "content": content})
+
+    # 检查生成的内容是否为 None
+    if content is None:
+        return "生成的内容为空，请检查输入或模型设置", messages
 
     return messages
 
@@ -102,7 +116,8 @@ def generate(theme, min_length, temperature, messages=None):
 def explain(messages):
     """ 生成解释 """
     messages.append({"role": "user", "content": "把这些你输出的句子翻译成正常的语言"})
-    return chat("deepseek-chat", messages, 1)
+    # 调用 chat 函数生成解释，使用 gpt-3.5-turbo 模型，temperature 设为 1
+    return chat("gpt-3.5-turbo", messages, 1)
 
 
 def run_task(task_id, theme, length_min, temp):
@@ -191,7 +206,7 @@ def explorer():
 @app.route("/explorer/index", methods=["GET"])
 def get_index():
     """返回 index.json 内容"""
-    return index_data
+    return Response(index_data, mimetype='application/json; charset=utf-8')
 
 
 @app.route("/explorer/language", methods=["GET"])
@@ -211,10 +226,10 @@ def get_language_files():
     c_file = os.path.join(lang_path, "c.txt")
     b_file = os.path.join(lang_path, "b.txt")
 
-    return jsonify({
+    return jsonify({  # Flask默认使用application/json; charset=utf-8
         "c": read_char(c_file),
         "b": read_char(b_file)
-    })
+    }), 200, {'Content-Type': 'application/json; charset=utf-8'}
 
 
 if __name__ == "__main__":
