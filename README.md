@@ -30,10 +30,16 @@
 OPENAI_API_KEY = ""
 # 请在下方输入API的url
 OPENAI_API_URL = "https://api.deepseek.com"
+# 请在下方输入生成句子的模型的名称
+SENTENCE_MODEL = "deepseek-reasoner"
+# 请在下方输入生成解释的模型的名称
+EXPLAIN_MODEL = "deepseek-chat"
 ```
 5. 点击部署
 6. 等待部署完成
 7. 进入项目设置，可添加自己的域名
+
+> **注意**：如果使用Vercel部署，需要存储数据库的功能（查看网友生成的句子）可能会出现问题
 # 本地部署教程
 ## 克隆项目
 ```bash
