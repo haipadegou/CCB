@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>提供 CCB 句子</title>
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --primary-hover: #4338ca;
+            --secondary-color: #f3f4f6;
+            --text-color: #111827;
+            --light-text: #6b7280;
+            --border-color: #e5e7eb;
+            --white: #ffffff;
+            --error-color: #ef4444;
+            --success-color: #10b981;
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-color);
+            background-color: #f9fafb;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: var(--light-text);
+            font-size: 16px;
+        }
+
+        .form-container {
+            background-color: var(--white);
+            border-radius: 8px;
+            box-shadow: var(--shadow-md);
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        .form-group label.required:after {
+            content: " *";
+            color: var(--error-color);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            font-size: 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            transition: border-color 0.3s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+        }
+
+        textarea.form-control {
+            min-height: 150px;
+            resize: vertical;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .radio-option input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--primary-color);
+            cursor: pointer;
+        }
+
+        .name-field {
+            display: none;
+            margin-top: 15px;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .error-message {
+            color: var(--error-color);
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert-error {
+            background-color: #fee2e2;
+            color: var(--error-color);
+            border: 1px solid #fecaca;
+        }
+
+        .alert-success {
+            background-color: #d1fae5;
+            color: var(--success-color);
+            border: 1px solid #a7f3d0;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .btn {
+            display: inline-block;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-block {
+            display: block;
+            width: 100%;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid var(--primary-color);
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+
+            .form-container {
+                padding: 20px;
+            }
+
+            .radio-group {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-poll"></i> 提供 CCB 句子</h1>
+            <p>感谢您提供句子，您的创作对我们训练AI非常重要</p>
+        </header>
+
+        <div class="form-container">
+            <div id="errorAlert" class="alert alert-error"></div>
+            <div id="successAlert" class="alert alert-success"></div>
+
+            <form id="questionnaireForm">
+                <div class="form-group">
+                    <label for="topic" class="required">主题</label>
+                    <input type="text" id="topic" class="form-control" placeholder="请输入主题..." required>
+                    <div id="topicError" class="error-message"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="content" class="required">句子内容（至少4个字）</label>
+                    <textarea id="content" class="form-control" placeholder="请在此输入您的句子内容..." required></textarea>
+                    <div id="contentError" class="error-message"></div>
+                </div>
+
+                <div class="form-group">
+                    <label class="required">是否匿名提交？</label>
+                    <div class="radio-group">
+                        <label class="radio-option">
+                            <input type="radio" name="anonymous" value="true" checked> 是，我要匿名提交
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="anonymous" value="false"> 否，我愿意署名
+                        </label>
+                    </div>
+
+                    <div id="nameField" class="name-field">
+                        <label for="name" class="required">您的名字</label>
+                        <input type="text" id="name" class="form-control" placeholder="请输入您的名字">
+                        <div id="nameError" class="error-message"></div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-block">提交问卷</button>
+                <div id="loading" class="loading">
+                    <div class="spinner"></div>
+                    <p>正在提交中，请稍候...</p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('questionnaireForm');
+            const anonymousRadios = document.querySelectorAll('input[name="anonymous"]');
+            const nameField = document.getElementById('nameField');
+            const nameInput = document.getElementById('name');
+            const loading = document.getElementById('loading');
+            const errorAlert = document.getElementById('errorAlert');
+            const successAlert = document.getElementById('successAlert');
+
+            // 匿名选项切换
+            anonymousRadios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    if (this.value === 'false') {
+                        nameField.style.display = 'block';
+                        nameInput.required = true;
+                    } else {
+                        nameField.style.display = 'none';
+                        nameInput.required = false;
+                        nameInput.value = '';
+                        hideError('name');
+                    }
+                });
+            });
+
+            // 显示错误信息
+            function showError(field, message) {
+                const errorElement = document.getElementById(`${field}Error`);
+                errorElement.textContent = message;
+                errorElement.style.display = 'block';
+                document.getElementById(field).classList.add('error-border');
+            }
+
+            // 隐藏错误信息
+            function hideError(field) {
+                const errorElement = document.getElementById(`${field}Error`);
+                errorElement.style.display = 'none';
+                document.getElementById(field).classList.remove('error-border');
+            }
+
+            // 显示全局错误提示
+            function showAlert(message, isSuccess = false) {
+                if (isSuccess) {
+                    errorAlert.style.display = 'none';
+                    successAlert.textContent = message;
+                    successAlert.style.display = 'block';
+                } else {
+                    successAlert.style.display = 'none';
+                    errorAlert.textContent = message;
+                    errorAlert.style.display = 'block';
+                }
+
+                // 5秒后自动隐藏
+                setTimeout(() => {
+                    if (isSuccess) {
+                        successAlert.style.display = 'none';
+                    } else {
+                        errorAlert.style.display = 'none';
+                    }
+                }, 5000);
+            }
+
+            // 清除所有错误提示
+            function clearErrors() {
+                hideError('topic');
+                hideError('content');
+                hideError('name');
+                errorAlert.style.display = 'none';
+                successAlert.style.display = 'none';
+            }
+
+            // 表单提交
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+
+                // 清除之前的错误提示
+                clearErrors();
+
+                // 显示加载动画
+                loading.style.display = 'block';
+
+                // 收集表单数据
+                const formData = {
+                    topic: document.getElementById('topic').value.trim(),
+                    content: document.getElementById('content').value.trim(),
+                    anonymous: document.querySelector('input[name="anonymous"]:checked').value === 'true',
+                    name: document.querySelector('input[name="anonymous"]:checked').value === 'false'
+                        ? document.getElementById('name').value.trim()
+                        : ''
+                };
+
+                try {
+                    // 发送到服务器
+                    const response = await fetch('/query_submit', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(formData)
+                    });
+
+                    const result = await response.json();
+
+                    console.log(result)
+
+                    if (!result.ok) {
+                        // 服务器返回错误
+                        if (result.errors) {
+                            // 字段级错误
+                            Object.keys(result.errors).forEach(field => {
+                                showError(field, result.errors[field]);
+                            });
+                        } else if (result.message) {
+                            // 全局错误
+                            showAlert(result.message);
+                        } else {
+                            showAlert('提交失败，请检查表单内容');
+                        }
+                        return;
+                    }
+
+                    // 提交成功处理
+                    showAlert('句子提交成功！感谢您的参与！', true);
+                    form.reset();
+                    nameField.style.display = 'none';
+                } catch (error) {
+                    console.error('提交出错:', error);
+                    showAlert('提交失败，请稍后再试: ' + error.message);
+                } finally {
+                    // 隐藏加载动画
+                    loading.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

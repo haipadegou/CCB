@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-    <meta charset="UTF-8">  <!-- 已正确声明 -->
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CCB 句子生成器</title>
     <style>
@@ -139,6 +139,7 @@
             const theme = document.getElementById("theme").value;
             const lengthMin = document.getElementById("lengthMin").value;
             const temperature = document.getElementById("temperature").value;
+            const public = document.getElementById("public").checked;
             const button = document.getElementById("generateButton");
             button.disabled = true;
             button.innerHTML = "生成中 <span class='spinner'></span>";
@@ -152,7 +153,7 @@
 
             const response = await fetch('/submit', {
                 method: 'POST',
-                body: JSON.stringify({ theme: theme, length_min: lengthMin, temperature: temperature }),
+                body: JSON.stringify({ theme: theme, length_min: lengthMin, temperature: temperature, public: public }),
                 headers: { 'Content-Type': 'application/json' }
             });
             const data = await response.json();
@@ -233,7 +234,7 @@
 <body>
     <div class="container">
         <h1>CCB 句子生成器</h1>
-        <p class="notice">⚠️ 您输入的数据可能会用于训练，请勿输入隐私信息。<br>本系统的句子由 DeepSeek 生成。</p>
+        <p class="notice">⚠️ 您输入的数据可能会用于训练，包括选择不公开显示的信息，请勿输入隐私信息。<br>本系统的句子由 DeepSeek 生成。</p>
         <label for="theme">输入主题:</label>
         <input type="text" id="theme" placeholder="请输入主题">
         <button id="generateButton" onclick="startTask()">生成 ✨</button>
@@ -246,6 +247,7 @@
 
 
         <div class="settings">
+            是否公开显示<input type="checkbox" id="public">
             <label for="lengthMin">句子长度下限 (1-15):</label>
             <input type="number" id="lengthMin" min="1" max="15" value="3">
             <label for="temperature">温度 (0.0-2.0):</label>
@@ -255,6 +257,7 @@
 
         <a href="/history" class="history-link">查看网友生成的句子</a>
         <a href="/explorer" class="history-link">浏览 CCB 词</a>
+        <a href="/query" class="history-link">提供您创作的句子</a>
 
     </div>
 </body>
