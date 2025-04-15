@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, request, render_template, jsonify, Response
 from openai import OpenAI
 from pypinyin import pinyin, Style
 from threading import Semaphore, Thread
@@ -12,7 +12,7 @@ from dotenv import load_dotenv  # 新增导入
 load_dotenv()  # 新增环境变量加载
 
 app = Flask(__name__)
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"),base_url=os.environ.get("OPENAI_API_URL"))
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"), base_url=os.environ.get("OPENAI_API_URL"))
 
 # 限制最大并发任务数
 MAX_CONCURRENT_REQUESTS = 1
@@ -39,7 +39,7 @@ SYMBOL = ',.?!;，。？！；'
 
 
 def read_char(fn):
-    with open(fn, encoding='utf-8') as f:
+    with open(fn, encoding='utf-8') as f:  # 已明确指定UTF-8
         data = f.read().split('\n')
         f.close()
         i = 0
@@ -136,7 +136,8 @@ def save(theme, sentence, explanation, cursor, conn, public):
     if len(sentence) >= 4:
         max_id = cursor.execute('SELECT MAX(id) FROM sentences').fetchall()[0][0] + 1
         cursor.execute(
-            "INSERT INTO sentences (id, time, theme, content, explain, public) VALUES (?, ?, ?, ?, ?, ?)", (max_id, time.time(), theme, sentence, explanation, public))
+            "INSERT INTO sentences (id, time, theme, content, explain, public) VALUES (?, ?, ?, ?, ?, ?)",
+            (max_id, time.time(), theme, sentence, explanation, public))
         conn.commit()
 
 
@@ -251,7 +252,8 @@ def history_data():
     cursor = conn.cursor()
     page = request.json.get('page')
     data = cursor.execute(
-        f'SELECT * FROM sentences WHERE public=1 ORDER BY time DESC LIMIT ? OFFSET ?', (HIS_LEN, page * HIS_LEN)).fetchall()
+        f'SELECT * FROM sentences WHERE public=1 ORDER BY time DESC LIMIT ? OFFSET ?',
+        (HIS_LEN, page * HIS_LEN)).fetchall()
     num = cursor.execute(
         f'SELECT COUNT(*) FROM sentences').fetchall()[0][0]
     for i in range(len(data)):
@@ -279,10 +281,12 @@ def post_comment():
     sent_id = int(request.json.get('sentence_id'))
     txt = request.json.get('text')
     com_num = cursor.execute(f'SELECT MAX(comment_id) FROM comments').fetchall()[0][0] + 1
-    cursor.execute(f'INSERT INTO comments (comment_id, sentence_id, time, content) VALUES (?, ?, ?, ?)', (com_num, sent_id, time.time(), txt))
+    cursor.execute(f'INSERT INTO comments (comment_id, sentence_id, time, content) VALUES (?, ?, ?, ?)',
+                   (com_num, sent_id, time.time(), txt))
     conn.commit()
     conn.close()
     return 'ok'
+
 
 # ------------------CCB词查看--------------
 
@@ -295,7 +299,7 @@ def explorer():
 @app.route("/explorer/index", methods=["GET"])
 def get_index():
     """返回 index.json 内容"""
-    return index_data
+    return Response(index_data, mimetype='application/json; charset=utf-8')
 
 
 @app.route("/explorer/language", methods=["GET"])
@@ -315,10 +319,10 @@ def get_language_files():
     c_file = os.path.join(lang_path, "c.txt")
     b_file = os.path.join(lang_path, "b.txt")
 
-    return jsonify({
+    return jsonify({  # Flask默认使用application/json; charset=utf-8
         "c": read_char(c_file),
         "b": read_char(b_file)
-    })
+    }), 200, {'Content-Type': 'application/json; charset=utf-8'}
 
 
 # ------------问卷-----------
