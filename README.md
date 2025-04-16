@@ -9,7 +9,6 @@
 # 在线DEMO
 <!--作者需要在合并拉去请求时更换链接内容↓-->
 [CCB生成器](https://ccb.focalors.ltd)
-[体验](http://47.99.50.149/)
 
 ## 技术栈
 - Python
