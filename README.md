@@ -5,7 +5,7 @@
 
 我将带领人类开发CCB直到100%
 
-本项目与 Bilibili UP 主 **害怕的狗XGGGGGGGGGGG** 的视频一同发布，欢迎关注！
+本项目与 Bilibili UP 主 **害怕的狗XGGGGGGGGGGG** 的视频[你挖币吗？我挖CC币！](https://www.bilibili.com/video/BV126ZVYKEVu)一同发布，欢迎关注！
 # 在线DEMO
 <!--作者需要在合并拉去请求时更换链接内容↓-->
 [CCB生成器](https://ccb.focalors.ltd)
@@ -17,6 +17,7 @@
 # Vercel部署教程
 1. 注册Vercel账号和Github账号
 > Vercel注册页面:[点击跳转](https://vercel.com/signup)
+
 > **注意**: 千万不要使用国内邮箱注册, 否则需要开工单
 2. 在Github上fork本项目
 3. 在Vercel上新建项目, 或者直接[点击跳转](https://vercel.com/new)
@@ -60,32 +61,51 @@ pip install -r requirements.txt
 python app.py
 ```
 
-## 使用本地模型生成
-如果有高性能设备，可以选择运行本地模型而不是使用DeepSeek API。
+# 使用本地模型生成
+通过网站收集到的训练数据，我们基于Qwen3-0.6B微调了一个模型，专门用于生成CCB句子。
 
-因为transformers可以修改模型输出的概率分布，所以可以程序化的控制输出，不需要通过深度思考来检查句子。这可以减少句子生成的时间。
-### 1. 安装依赖
+`train.ipynb`中有训练程序。`train_data.json`包含部分训练数据。为了保护个人隐私，文件中只包含同意公开显示的数据。
+
+网站一共收集到了1000条句子，由于缺少训练数据，模型有一点过拟合，可能会出现以下现象：
+- 词汇量少
+- 一些字会同时出现，例如例如很多观众喜欢输入赤石，所以“粑”和“吃”经常一起出现
+- 一些字会频繁地出现，即使和主题无关
+- 知识量少，无法理解一些主题
+- 偶尔在句子结尾会出现随机词语
+
+如果一次效果不好可以多试几次。
+## 1. 安装依赖
 ```bash
 pip install -r -requirements.txt
 ```
 PyTorch安装方法：[https://pytorch.org/get-started/locally/](https://pytorch.org/get-started/locally/)
 
-### 2. 下载模型
-从 [Hugging Face](https://huggingface.co/) 下载任意大语言模型，并将其存放到 `model` 文件夹，不要选择 **推理专用模型（reasoning models）**。
-
-在当前文件夹使用以下命令下载模型：
+## 2. 下载基础模型
+在当前文件夹使用以下命令下载模型（不需要登录）：
 ```bash
-huggingface-cli download <模型名称> --local-dir model
+huggingface-cli download Qwen/Qwen3-0.6B-Base --local-dir qwen3
 ```
 
-### 3. 运行
+## 3. 运行
 运行程序后，通过命令行交互输入主题，并生成符合规则的 CCB 句子。
 ```bash
 python ai_ccb_generator.py
 ```
 
-### 4. 调整参数
+## 4. 调整参数
 你可以修改程序中的以下常数来调整生成行为：
-- `SYS_PROMPT`（系统提示）
-- `MIN_LENGTH`（长度下限）
 - `MAX_LENGTH`（长度上限）
+- `MIN_LENGTH`（长度下限）
+- `CONTROL_OUTPUT` (是否程序化控制输出)
+- `TEMPERATURE` (温度)
+
+## 5. 生成解释（可选）
+从 [Hugging Face](https://huggingface.co/) 下载任意大语言模型，并将其存放到 `model` 文件夹，不要选择 **预训练阶段的模型**（例如上文要求下载的Qwen模型）。此步骤不做也不会影响程序正常运行。
+
+例如，下载Llama-3.1可以使用以下命令（需要先登录）：
+```bash
+huggingface-cli download meta-llama/Llama-3.1-8B-Instruct --local-dir model
+```
+
+## 6. 贡献数据
+感谢食堂里面开火车、咕噜咕噜、许永豪、阿尔都塞的睡衣、老八、功德台湾、天上飞吧鸡管路、塞琳、紫塔制造机、Bronie、not_beting、not_beting、CCB大蛇、草超棒、和所有匿名用户贡献的训练数据。
