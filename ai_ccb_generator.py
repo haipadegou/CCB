@@ -1,102 +1,153 @@
+import os
+import re
+from peft import PeftModel
+from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer, BitsAndBytesConfig
+from pypinyin import pinyin, Style
 import threading
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
-from pypinyin import pinyin, Style
 
-MIN_LENGTH = 10
 MAX_LENGTH = 30
-SYS_PROMPT = f'''请根据用户提供的主题，按以下优先级生成至少{MIN_LENGTH}个字的中文短句（无需标点）：
+MIN_LENGTH = 4
+CONTROL_OUTPUT = True
+TEMPERATURE = 0.7
 
-第一优先级：主题相关性
+SYMBOL = ',.?!:;，。？！：；、 \n'
 
-句子必须围绕用户给定的主题（如“春天”“学校”等），优先使用与主题直接相关的词汇，句子至少有{MIN_LENGTH}个字。
 
-示例：
-✅ 主题“春天” → 花开风吹过（优先主题）
-❌ 主题“春天” → 汽车奔跑（偏离主题）
+def get_pinyin_initials(input_str):
+    # 英文单词：返回首字母 + 空字符串
+    if input_str.isascii():
+        return input_str[0].lower(), ""
+    # 处理中文
+    if len(input_str) == 1:
+        # 单字：获取所有可能的拼音首字母
+        all_pinyin = pinyin(input_str, style=Style.NORMAL, heteronym=True)  # 如 [['zhong'], ['chong']]
+        initials = {py[0][0].lower() for py in all_pinyin}  # 去重并转为小写
+        return "".join(sorted(initials)), ""  # 按字母顺序排列
+    else:
+        # 两字及以上：默认词语读音唯一，直接取首字母
+        pinyin_initials = pinyin(input_str, style=Style.FIRST_LETTER)
+        if len(pinyin_initials) < 2:
+            return "", ""
+        return pinyin_initials[0][0], pinyin_initials[1][0]
 
-第二优先级：通顺性
 
-句子需自然可读，避免生硬拼接，可接受名词组合（如“晨读书声”）。
+def classify_token(token):
+    """按扩展规则分类token"""
+    first, second = get_pinyin_initials(token)
+    categories = set()
+    if not (token.isascii() or 0x4E00 <= ord(token[0]) <= 0x9FFF or token in SYMBOL):
+        return categories
 
-示例：
-✅ 春风拂面（通顺）
-❌ 春菜笔（语义断裂）
+    if 'c' in first and (second == 'c' or second == '') or token in SYMBOL:
+        categories.add(0)  # cc
 
-第三优先级：CCB结构（尽量满足）
+    if 'c' in first and (second == 'b' or second == '') or token in SYMBOL:
+        categories.add(1)  # cb
 
-若不影响前两条规则，尽量让每个字的拼音首字母按 C→C→B→C→C→B 循环（可截断）。
+    if 'b' in first and (second == 'c' or second == '') or token in SYMBOL:
+        categories.add(2)  # bc
 
-结构示例：
-✅ 春晨碧草翠波（C-C-B-C-C-B，符合）
-✅ 聪才笔创（C-C-B-C，符合）
-❌ 校园跑（X-Y-P，首字母错误）'''
+    return categories
 
+
+def classify_vocab(tokenizer):
+    """分类整个词汇表"""
+    classified = [[], [], []]
+
+    for token_id in range(tokenizer.vocab_size):
+        try:
+            token = tokenizer.decode([token_id])
+        except:
+            continue
+        # 跳过特殊token
+        if token.startswith("<") and token.endswith(">"):
+            continue
+
+        categories = classify_token(token)
+        for cat in categories:
+            classified[cat].append(token_id)
+
+    return classified
+
+
+def count_chinese_and_english(text):
+    chinese_chars = re.findall(r'[\u4e00-\u9fff]', text)
+    chinese_count = len(chinese_chars)
+
+    english_words = re.findall(r"[a-zA-Z']+", text)
+    english_count = len(english_words)
+
+    return chinese_count + english_count
 
 
 class CCB_AI(object):
     def __init__(self):
-
-        model_name = "model"
-
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            torch_dtype='auto',
-            device_map="auto"
+        quantization_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_quant_type="nf4"
         )
-        self.model = torch.compile(model)
+        base_model = AutoModelForCausalLM.from_pretrained('qwen3', device_map="auto",
+                                                           quantization_config=quantization_config)
+        self.sent_model = PeftModel.from_pretrained(base_model, "qwen-ccb")
+        self.tokenizer = AutoTokenizer.from_pretrained('qwen-ccb')
+        self.exp_model = None
+        self.exp_tokenizer = None
+        if os.path.isdir('model'):
+            self.exp_model = AutoModelForCausalLM.from_pretrained('model', device_map="auto",
+                                                                  quantization_config=quantization_config)
+            self.exp_tokenizer = AutoTokenizer.from_pretrained('model')
 
-        print('使用设备：', self.model.device)
+        print('使用设备：', self.sent_model.device)
 
-        self.c_valid_tokens = []
-        self.b_valid_tokens = []
-        for token_id in range(self.tokenizer.vocab_size):
-            word = self.tokenizer.decode([token_id])
-            if len(word) == 1 and 'c' in pinyin(word, style=Style.FIRST_LETTER, heteronym=True)[0]:
-                self.c_valid_tokens.append(token_id)
-            if len(word) == 1 and 'b' in pinyin(word, style=Style.FIRST_LETTER, heteronym=True)[0]:
-                self.b_valid_tokens.append(token_id)
+        self.classified = classify_vocab(self.tokenizer)
+        self.min_length = 4
 
-        self.index = 0
+    def sent_allowed_tokens(self, batch_id, input_ids):
+        ans = self.tokenizer.decode(input_ids)
+        ans = ans.split('### ASSISTANT:')[1]
+        n = count_chinese_and_english(ans)
+        if n >= self.min_length:
+            return self.classified[n % 3] + [self.tokenizer.eos_token_id]
+        else:
+            return self.classified[n % 3]
 
-    def prefix_allowed_tokens_fn(self, batch_id, input_ids):
-        self.index += 1
-        if self.index > MIN_LENGTH:
-            self.c_valid_tokens.append(self.tokenizer.eos_token_id)
-            self.b_valid_tokens.append(self.tokenizer.eos_token_id)
-        if self.index % 3:
-            return self.c_valid_tokens
-        return self.b_valid_tokens
+    def generate(self, prompt, min_length=4, temp=0.7):
+        self.min_length = min_length
+        if CONTROL_OUTPUT:
+            fun = self.sent_allowed_tokens
+        else:
+            fun = None
+        model_inputs = self.tokenizer(f'### USER: {prompt}\n### ASSISTANT:', return_tensors="pt").to(
+            self.sent_model.device)
+        out = self.sent_model.generate(**model_inputs, max_new_tokens=MAX_LENGTH, temperature=temp,
+                                       prefix_allowed_tokens_fn=fun, use_cache=True, do_sample=True)
+        out = self.tokenizer.decode(out[0], skip_special_tokens=True)
+        return out
 
-    def generate(self, prompt):
-        self.index = 0
+    def explain(self, prompt, sentence, streamer):
         messages = [
-            {"role": "system", "content": SYS_PROMPT},
-            {"role": "user", "content": '主题：' + prompt}
+            {"role": "user", "content": f"用“{prompt}”为主题生成一个句子，使句子中每个字的拼音首字母交替是C和C和B"},
+            {"role": "assistant", "content": sentence},
+            {"role": "user", "content": "这个句子是什么意思？"},
         ]
-        text = self.tokenizer.apply_chat_template(
+        print(messages)
+        text = self.exp_tokenizer.apply_chat_template(
             messages,
             tokenize=False,
             add_generation_prompt=True
         )
-        model_inputs = self.tokenizer([text], return_tensors="pt").to(self.model.device)
-
+        model_inputs = self.exp_tokenizer([text], return_tensors="pt").to(self.exp_model.device)
         size = model_inputs['input_ids'].shape[1]
 
-        # 1. 创建 Streamer 用于流式输出
-        streamer = TextIteratorStreamer(self.tokenizer, skip_prompt=True, skip_special_tokens=True)
-
-        # 2. 启动一个线程执行 `generate`，避免阻塞
         thread = threading.Thread(
-            target=self.model.generate,
+            target=self.exp_model.generate,
             kwargs={
                 "input_ids": model_inputs["input_ids"],
                 "attention_mask": model_inputs["attention_mask"],
-                "max_length": size + MAX_LENGTH,
-                "prefix_allowed_tokens_fn": self.prefix_allowed_tokens_fn,
-                "temperature": 0.7,
+                "max_length": size + MAX_LENGTH * 2,
+                "temperature": 0.5,
                 "use_cache": True,
                 "do_sample": True,
                 "streamer": streamer  # 关键：使用 Streamer
@@ -104,19 +155,18 @@ class CCB_AI(object):
         )
         thread.start()
 
-        # 3. 逐步输出结果
-        print("生成结果：", end="", flush=True)
-        for new_text in streamer:
-            print(new_text, end="", flush=True)  # 实时打印
-
-        print()  # 换行
-        self.c_valid_tokens.pop()
-        self.b_valid_tokens.pop()
-
 
 if __name__ == '__main__':
     ai = CCB_AI()
+    streamer = TextIteratorStreamer(ai.tokenizer, skip_prompt=True, skip_special_tokens=True)
     while True:
         text = input('输入主题：')
-        print('正在生成（可能需要几分钟）')
-        ai.generate(text)
+        print("生成结果：")
+        sentence = ai.generate(text, MIN_LENGTH, TEMPERATURE)
+        print(sentence)
+        if not (ai.exp_model is None):
+            ai.explain(text, sentence, streamer)
+            print("解释：", end="", flush=True)
+            for new_text in streamer:
+                print(new_text, end="", flush=True)  # 实时打印
+            print()
