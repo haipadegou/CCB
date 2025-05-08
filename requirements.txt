@@ -4,3 +4,4 @@ pypinyin>=0.0.1
 python-dotenv>=1.0.0
 transformers>=0.0.1
 bitsandbytes>=0.45.5
+peft>=0.6.2
