@@ -129,7 +129,7 @@ class CCB_AI(object):
     def sent_allowed_tokens(self, batch_id, input_ids):
         ans = ' ' + self.tokenizer.decode(input_ids)[self.start:]
         n = count_chinese_and_english(ans)
-        valid = self.topk(self.get_sent(input_ids).unsqueeze(0).to(self.sent_model.device), self.classified[n % 3]) + self.classified[n % 3 + 3]
+        valid = self.filter(self.get_sent(input_ids).unsqueeze(0).to(self.sent_model.device), self.classified[n % 3]) + self.classified[n % 3 + 3]
         if ans[-1] not in SYMBOL:
             valid += self.classified[6]
         if n >= self.min_length:
@@ -196,29 +196,40 @@ class CCB_AI(object):
         )
         thread.start()
 
-    def topk(self, inputs, token_ids, top_k=64):
+    def filter(self, inputs, token_ids, k=0.025):
         if inputs.shape[1] == 0:
             return token_ids
         # 获取模型输出
         with torch.no_grad():
             outputs = self.valid_model(inputs)
 
-        # 获取下一个token的logits
+        # 获取最后一个位置的logits
         logits = outputs.logits[0, -1, :]
 
-        # 计算softmax得到概率分布
+        # 计算所有token的概率
         probs = torch.softmax(logits, dim=-1)
 
         # 只保留候选token IDs的概率
         candidate_probs = probs[torch.tensor(token_ids, device=self.sent_model.device)]
 
-        # 获取概率最高的top_k个token
-        _, top_k_indices = torch.topk(candidate_probs, k=top_k)
+        # 找到候选token中的最高概率（而不是所有token中的最高概率）
+        max_prob_in_candidates = torch.max(candidate_probs)
 
-        # 将结果转换为列表
-        top_k_tokens = [token_ids[i] for i in top_k_indices.tolist()]
+        # 计算阈值
+        threshold = max_prob_in_candidates * k
 
-        return top_k_tokens
+        # 筛选出概率大于阈值的token
+        mask = candidate_probs > threshold
+        selected_indices = torch.nonzero(mask).squeeze(-1)
+
+        # 获取对应的token IDs和概率
+        selected_tokens = [token_ids[i] for i in selected_indices.tolist()]
+
+        # 按概率从高到低排序
+        sorted_indices = torch.argsort(candidate_probs[selected_indices], descending=True)
+        selected_tokens = [selected_tokens[i] for i in sorted_indices.tolist()]
+
+        return selected_tokens
 
     def get_sent(self, token_ids):
         last_eos_pos = -1
